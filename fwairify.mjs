@@ -118,11 +118,13 @@ const rawPfp = subjectBuf;
 subjectBuf = await sharp(subjectBuf).resize(256, 256, { fit: "cover" }).png().toBuffer();
 
 // Near-flat pfps (solid-color logos) give the model nothing to hold on to and
-// it drifts into copying a style ref. Detect them and spell the subject out.
+// it drifts into copying a style ref. Detect them by ENTROPY, not stdev — a
+// dark low-contrast photo has low stdev too, and the old stdev<40 check told
+// the model auryn_macmillan's stipple portrait was "a logo, do NOT render a
+// person" (flat logos measure ~1.5, real photos ~5+).
 const stats = await sharp(subjectBuf).stats();
-const maxStdev = Math.max(...stats.channels.slice(0, 3).map((c) => c.stdev));
 let subjectHint = "";
-if (maxStdev < 40) {
+if (stats.entropy < 3) {
   const [r, g, b] = stats.channels.map((c) => Math.round(c.mean));
   subjectHint = `\nNOTE: the subject image is a minimal abstract logo (dominant color rgb(${r},${g},${b})). Do NOT render a person. The plush is that logo itself: a soft geometric plush of the same shape and exact color, with the signature black bead eyes, stuffed into the glass box.`;
 }
@@ -146,10 +148,10 @@ const REF_POOL = [
   "0d18fef85350986934e20510d922e0b0.avif", // beard + beanie + tattoos
   "1842265a88baafd960fbbaf45386fe2a.avif", // boy, teal shirt — generic, magnetic; keep last
 ];
-// --ref <file.avif> pins a single specific reference from example/ (overrides --refs)
+// --ref <file[,file…]> pins specific reference(s) from example/ (overrides --refs)
 const pinnedRef = opt("ref", "");
 const refList = pinnedRef
-  ? [pinnedRef.endsWith(".avif") ? pinnedRef : pinnedRef + ".avif"]
+  ? pinnedRef.split(",").map((f) => (f.endsWith(".avif") ? f : f + ".avif"))
   : REF_POOL.slice(0, nRefs);
 const refFiles = [];
 for (const f of refList) {

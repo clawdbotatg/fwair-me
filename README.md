@@ -26,10 +26,18 @@ node fwairify.mjs <@handle | image-path> [--out f.png] [--quality high] [--n 3] 
 
 ## Cost (measured, $8/M in + $30/M out)
 
-Defaults are **quality low + 2 style refs ≈ $0.034/image** — at tweet size it's
-indistinguishable from high/3-refs ($0.24). Each style ref costs 1,024 input tokens
-($0.008). Quality tiers at 3 refs: high $0.24 · medium $0.09 · low $0.04.
-Comparison grids: `out/quality-compare.jpg`, `out/refs-compare.jpg`.
+Defaults: **quality low + 1 ref (pepe king) + 256px inputs + trimmed prompt ≈
+$0.012/image** (762 in + 196 out tokens) — down from $0.24 at the original
+high/3-refs settings with no visible quality loss at tweet size.
+
+The three levers, in order of impact:
+1. **quality low** — output drops 7,024 → 196 tokens ($0.21 → $0.006)
+2. **256px input images** — images bill ~(px/16)² tokens capped at 1,024, so
+   256px costs 256 vs 1,024 at ≥512px; one ref instead of three
+3. **trimmed prompt** — 490 → 245 text tokens
+
+Comparison grids: `out/quality-compare.jpg`, `out/refs-compare.jpg`,
+`out/ref-pick-grid.jpg`; size test: `out/size-test-*.png`, `out/cheap-*.png`.
 
 Secrets live in `.env` (gitignored): `OPENAI_API_KEY`.
 

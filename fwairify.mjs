@@ -110,8 +110,12 @@ if (fs.existsSync(input)) {
   }
   name = input.toLowerCase();
 }
-// normalize whatever we got (avif/webp/jpg, tiny sizes) to a clean square png
-subjectBuf = await sharp(subjectBuf).resize(768, 768, { fit: "cover" }).png().toBuffer();
+// normalize whatever we got (avif/webp/jpg, tiny sizes) to a clean square png.
+// 256px is deliberate: input images bill ~(px/16)² tokens capped at 1024, so
+// 256px costs 256 tokens vs 1024 at ≥512px — with no visible quality loss
+// (out/cheap-*.png vs out/size-test-768.png, 2026-08-24).
+const rawPfp = subjectBuf;
+subjectBuf = await sharp(subjectBuf).resize(256, 256, { fit: "cover" }).png().toBuffer();
 
 // Near-flat pfps (solid-color logos) give the model nothing to hold on to and
 // it drifts into copying a style ref. Detect them and spell the subject out.
@@ -127,7 +131,7 @@ const outFileBase = opt("out", path.join(HERE, "out", `${name}.png`));
 await fsp.mkdir(path.dirname(outFileBase), { recursive: true });
 if (flag("keep-pfp")) {
   const p = outFileBase.replace(/\.png$/, ".pfp.png");
-  await fsp.writeFile(p, subjectBuf);
+  await fsp.writeFile(p, rawPfp);
   console.log(`  saved source pfp → ${p}`);
 }
 
@@ -151,25 +155,14 @@ const refFiles = [];
 for (const f of refList) {
   const p = path.join(HERE, "example", f);
   if (!fs.existsSync(p)) continue;
-  const png = await sharp(await fsp.readFile(p)).png().toBuffer();
+  const png = await sharp(await fsp.readFile(p)).resize(256, 256).png().toBuffer();
   refFiles.push(await toFile(png, f.replace(/\.avif$/, ".png"), { type: "image/png" }));
 }
 if (!refFiles.length) die("no style refs found in example/ — restore the folder");
 
 // ---------------------------------------------------------------- the prompt
-const PROMPT = `The FIRST input image is the SUBJECT: someone's profile picture. Every other input image is a STYLE REFERENCE from the "fwair" collection — match their rendering style exactly.
-
-Recreate the subject as a fwair plush: a chunky chibi stuffed toy squeezed snugly into a clear glass display cube that it completely fills, photographed straight-on.
-
-Style rules (non-negotiable):
-- The whole character is sewn from fuzzy bouclé terry fleece. EVERY detail — hair, eyebrows, facial hair, clothing, hats, glasses, jewelry, logos, tattoos — is built from soft fabric pieces, felt appliqué, or embroidery. Nothing is drawn, printed, or photographic.
-- Proportions: an oversized head filling the upper two thirds of the box; a small squat seated body below; two big rounded feet pointing forward at the bottom corners; stubby arms squished flat against the side walls.
-- The plush is comically overstuffed: the box is a size too small for it. Hair/head presses against the top pane, shoulders and arms squash flat against the side panes with visible bulging and creasing, feet press toward the front. Almost zero empty space inside the box — fabric touches all four inner walls.
-- Eyes: glossy black plastic beads with two white specular highlights. This is the ONLY shiny non-fabric material.
-- Likeness: keep the subject recognizable — hair style and color, skin/fur tone, facial hair, glasses, headwear, clothing type and colors, and any distinctive accessory, all translated into the plush fabric language. Simplify the face to the chibi idiom (small stitched mouth, felt brows) without losing who it is. If the subject is a logo, symbol, or abstract shape, the plush IS that shape sewn in fleece with its exact colors (e.g. a blue square logo becomes a squishy blue square plush with bead eyes stuffed in the box). If it is an animal or illustrated character, plushify that character.
-- NEVER copy a person, character, or colors from the style references — they define rendering style only. The identity comes exclusively from the first image.
-- Composition: perfectly square, frontal, the glass box's thin transparent frame visible along all four edges, soft even studio lighting, dark neutral background outside the glass, photorealistic product-photo rendering.
-No text, no watermark.${subjectHint}`;
+// Trimmed 2026-08-24 (490 → ~245 tokens, same results — see out/cheap-trimprompt.png).
+const PROMPT = `Turn the subject of the FIRST image (person, character, or logo) into a plush from the fwair collection, matching the rendering style of the other input image(s) exactly: a chunky chibi stuffed toy sewn entirely from fuzzy boucle fleece, comically overstuffed into a clear glass display cube it barely fits - oversized head pressed against the top pane, stubby arms and shoulders squashed flat against the side walls with visible bulging, two big rounded feet at the bottom front, fabric touching all four inner walls. Every detail (hair, brows, facial hair, glasses, hats, clothing, jewelry, tattoos, logos) is soft fabric, felt applique, or embroidery - nothing drawn or printed. The only shiny material: glossy black plastic bead eyes with two white highlights. Keep the subject clearly recognizable - hair style and color, skin tone, accessories, outfit colors - translated into fabric; simplify the face to the chibi idiom. An abstract logo becomes that shape itself sewn in fleece with bead eyes. Never copy identity or colors from the style reference. Square frontal product photo, thin glass frame visible on all four edges, soft even studio light, dark neutral background. No text, no watermark.${subjectHint}`;
 
 // ---------------------------------------------------------------- generate
 const client = new OpenAI();

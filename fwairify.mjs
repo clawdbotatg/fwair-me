@@ -133,11 +133,11 @@ if (flag("keep-pfp")) {
 
 // ---------------------------------------------------------------- style refs
 // Curated spread: a clean simple one, a detailed human, and a non-human.
-// Ranked by the 2026-08-24 single-ref bake-off (out/ref-pick-grid.jpg): the
-// grumpy guy won — most overstuffed, best glass-press, no color bleed.
+// Ranked by the 2026-08-24 single-ref bake-off (out/ref-pick-grid.jpg) plus
+// Austin's call: pepe king is the best piece in the collection — lead ref.
 const REF_POOL = [
-  "343575df12a8a9beaff11fddc3ab3e96.avif", // grumpy guy, arms pressed on glass — THE ref
-  "eb72695a2e66542a7bd17a9cb001fbc9.avif", // pepe king — non-human, accessories
+  "eb72695a2e66542a7bd17a9cb001fbc9.avif", // pepe king — Austin's pick, non-human, accessories
+  "343575df12a8a9beaff11fddc3ab3e96.avif", // grumpy guy — bake-off winner on squish/glass-press
   "5bb8312b9fef9f269466e1fd4ba7cfe2.avif", // man in suit — human detail, appliqué clothing
   "0d18fef85350986934e20510d922e0b0.avif", // beard + beanie + tattoos
   "1842265a88baafd960fbbaf45386fe2a.avif", // boy, teal shirt — generic, magnetic; keep last

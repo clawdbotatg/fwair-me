@@ -41,6 +41,22 @@ Comparison grids: `out/quality-compare.jpg`, `out/refs-compare.jpg`,
 
 Secrets live in `.env` (gitignored): `OPENAI_API_KEY`.
 
+## Setup on a new machine
+
+```
+git clone https://github.com/clawdbotatg/fwair-me && cd fwair-me
+npm install                       # openai + sharp
+echo "OPENAI_API_KEY=sk-..." > .env
+node fwairify.mjs austingriffith  # smoke test (~$0.012)
+```
+
+- The 5 style refs ship in `refs/` (tracked) — no other assets needed.
+- Optional: `X_BEARER_TOKEN` in `.env` for direct X-API pfp lookup (better
+  resolution + real no-pfp detection); without it, handle lookup falls back
+  to unavatar.io. On Austin's machines it auto-loads from
+  `~/clawd/clawd-twitter/.env` if that repo exists.
+- Node 20.6+ (uses `process.loadEnvFile`).
+
 ## Verified on
 
 | input | result |

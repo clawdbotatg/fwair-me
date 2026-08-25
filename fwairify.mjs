@@ -151,12 +151,15 @@ const refList = pinnedRef
   : REF_POOL.slice(0, nRefs);
 const refFiles = [];
 for (const f of refList) {
-  const p = path.join(HERE, "example", f);
+  // refs/ is tracked in git (the 5 pipeline refs travel with the repo);
+  // example/ is the larger gitignored local stash.
+  let p = path.join(HERE, "refs", f);
+  if (!fs.existsSync(p)) p = path.join(HERE, "example", f);
   if (!fs.existsSync(p)) continue;
   const png = await sharp(await fsp.readFile(p)).resize(256, 256).png().toBuffer();
   refFiles.push(await toFile(png, f.replace(/\.avif$/, ".png"), { type: "image/png" }));
 }
-if (!refFiles.length) die("no style refs found in example/ — restore the folder");
+if (!refFiles.length) die("no style refs found in refs/ or example/");
 
 // ---------------------------------------------------------------- the prompt
 // Trimmed 2026-08-24 (490 → ~245 tokens, same results — see out/cheap-trimprompt.png).

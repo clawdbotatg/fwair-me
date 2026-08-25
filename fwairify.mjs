@@ -41,11 +41,12 @@ const opt = (name, dflt) => {
 const flag = (name) => args.includes(`--${name}`);
 
 const input = args[0].replace(/^@/, "");
-// Defaults tuned 2026-08-24: low quality + 2 refs ≈ $0.034/image and holds the
-// style — high/3 refs (≈$0.24) looked no better at tweet size (see out/*-compare.jpg).
+// Defaults tuned 2026-08-24: low quality + 1 ref (the bake-off winner) ≈
+// $0.026/image and holds the style — high/3 refs (≈$0.24) looked no better at
+// tweet size (see out/quality-compare.jpg, out/refs-compare.jpg, out/ref-pick-grid.jpg).
 const quality = opt("quality", "low");
 const nVariants = parseInt(opt("n", "1"), 10);
-const nRefs = parseInt(opt("refs", "2"), 10);
+const nRefs = parseInt(opt("refs", "1"), 10);
 
 function die(msg) { console.error(`fwairify: ${msg}`); process.exit(1); }
 
@@ -132,15 +133,22 @@ if (flag("keep-pfp")) {
 
 // ---------------------------------------------------------------- style refs
 // Curated spread: a clean simple one, a detailed human, and a non-human.
+// Ranked by the 2026-08-24 single-ref bake-off (out/ref-pick-grid.jpg): the
+// grumpy guy won — most overstuffed, best glass-press, no color bleed.
 const REF_POOL = [
-  "5bb8312b9fef9f269466e1fd4ba7cfe2.avif", // man in suit — human detail, appliqué clothing
+  "343575df12a8a9beaff11fddc3ab3e96.avif", // grumpy guy, arms pressed on glass — THE ref
   "eb72695a2e66542a7bd17a9cb001fbc9.avif", // pepe king — non-human, accessories
-  "343575df12a8a9beaff11fddc3ab3e96.avif", // grumpy guy, arms pressed on glass
+  "5bb8312b9fef9f269466e1fd4ba7cfe2.avif", // man in suit — human detail, appliqué clothing
   "0d18fef85350986934e20510d922e0b0.avif", // beard + beanie + tattoos
   "1842265a88baafd960fbbaf45386fe2a.avif", // boy, teal shirt — generic, magnetic; keep last
 ];
+// --ref <file.avif> pins a single specific reference from example/ (overrides --refs)
+const pinnedRef = opt("ref", "");
+const refList = pinnedRef
+  ? [pinnedRef.endsWith(".avif") ? pinnedRef : pinnedRef + ".avif"]
+  : REF_POOL.slice(0, nRefs);
 const refFiles = [];
-for (const f of REF_POOL.slice(0, nRefs)) {
+for (const f of refList) {
   const p = path.join(HERE, "example", f);
   if (!fs.existsSync(p)) continue;
   const png = await sharp(await fsp.readFile(p)).png().toBuffer();

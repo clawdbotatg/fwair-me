@@ -1,0 +1,11 @@
+# local example images from the fwair-pfps collection (reference only, not ours to publish)
+example/
+
+# secrets
+.env
+
+# generated output + working files
+out/
+.cache/
+node_modules/
+.DS_Store

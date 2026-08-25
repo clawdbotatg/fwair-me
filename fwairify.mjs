@@ -117,17 +117,13 @@ if (fs.existsSync(input)) {
 const rawPfp = subjectBuf;
 subjectBuf = await sharp(subjectBuf).resize(256, 256, { fit: "cover" }).png().toBuffer();
 
-// Near-flat pfps (solid-color logos) give the model nothing to hold on to and
-// it drifts into copying a style ref. Detect them by ENTROPY, not stdev — a
-// dark low-contrast photo has low stdev too, and the old stdev<40 check told
-// the model auryn_macmillan's stipple portrait was "a logo, do NOT render a
-// person" (flat logos measure ~1.5, real photos ~5+).
-const stats = await sharp(subjectBuf).stats();
-let subjectHint = "";
-if (stats.entropy < 3) {
-  const [r, g, b] = stats.channels.map((c) => Math.round(c.mean));
-  subjectHint = `\nNOTE: the subject image is a minimal abstract logo (dominant color rgb(${r},${g},${b})). Do NOT render a person. The plush is that logo itself: a soft geometric plush of the same shape and exact color, with the signature black bead eyes, stuffed into the glass box.`;
-}
+// There is deliberately NO flat-logo classifier here. Two generations of it
+// misfired (stdev<40 flagged auryn's dark portrait, entropy<3 flagged
+// econoar's CryptoPunk — both got "do NOT render a person" and came out as
+// blobs), and the trimmed prompt's own "an abstract logo becomes that shape
+// itself" line handles real logos (base, all-white) without any hint —
+// verified 2026-08-24, out/nohint-*.png.
+const subjectHint = "";
 
 const outFileBase = opt("out", path.join(HERE, "out", `${name}.png`));
 await fsp.mkdir(path.dirname(outFileBase), { recursive: true });

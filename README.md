@@ -20,6 +20,16 @@ node fwairify.mjs <@handle | image-path> [--out f.png] [--quality high] [--n 3] 
 - **Flat-logo guard**: a near-solid-color pfp (e.g. the Base blue square) is detected
   by channel stdev and described explicitly in the prompt, otherwise the model drifts
   into copying a style reference instead of the subject.
+- **No-pfp guard**: an account on Twitter's default silhouette avatar fails loudly
+  (X API path checks the `default_profile` URL; unavatar path pixel-compares against
+  `assets/default-avatar.png`) instead of plushifying the gray egg.
+
+## Cost (measured, $8/M in + $30/M out)
+
+Defaults are **quality low + 2 style refs ≈ $0.034/image** — at tweet size it's
+indistinguishable from high/3-refs ($0.24). Each style ref costs 1,024 input tokens
+($0.008). Quality tiers at 3 refs: high $0.24 · medium $0.09 · low $0.04.
+Comparison grids: `out/quality-compare.jpg`, `out/refs-compare.jpg`.
 
 Secrets live in `.env` (gitignored): `OPENAI_API_KEY`.
 

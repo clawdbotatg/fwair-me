@@ -41,9 +41,11 @@ const opt = (name, dflt) => {
 const flag = (name) => args.includes(`--${name}`);
 
 const input = args[0].replace(/^@/, "");
-const quality = opt("quality", "high");
+// Defaults tuned 2026-08-24: low quality + 2 refs ≈ $0.034/image and holds the
+// style — high/3 refs (≈$0.24) looked no better at tweet size (see out/*-compare.jpg).
+const quality = opt("quality", "low");
 const nVariants = parseInt(opt("n", "1"), 10);
-const nRefs = parseInt(opt("refs", "3"), 10);
+const nRefs = parseInt(opt("refs", "2"), 10);
 
 function die(msg) { console.error(`fwairify: ${msg}`); process.exit(1); }
 
@@ -58,7 +60,13 @@ async function fetchPfp(handle) {
       );
       if (r.ok) {
         const j = await r.json();
-        const url = j?.data?.profile_image_url?.replace("_normal", "_400x400");
+        const raw = j?.data?.profile_image_url;
+        if (raw?.includes("default_profile")) {
+          const err = new Error(`@${handle} has no profile picture set — nothing to fwairify`);
+          err.noPfp = true;
+          throw err;
+        }
+        const url = raw?.replace("_normal", "_400x400");
         if (url) {
           const img = await fetch(url);
           if (img.ok) return Buffer.from(await img.arrayBuffer());
@@ -67,12 +75,24 @@ async function fetchPfp(handle) {
         console.warn(`  X API ${r.status} for @${handle}, falling back to unavatar`);
       }
     } catch (e) {
+      if (e.noPfp) throw e;
       console.warn(`  X API failed (${e.message}), falling back to unavatar`);
     }
   }
   const r = await fetch(`https://unavatar.io/x/${handle}?fallback=false`);
   if (!r.ok) throw new Error(`could not resolve a pfp for @${handle} (unavatar ${r.status})`);
-  return Buffer.from(await r.arrayBuffer());
+  const buf = Buffer.from(await r.arrayBuffer());
+  // unavatar can serve Twitter's default silhouette instead of 404ing — compare
+  // against a saved copy so we don't lovingly plushify the gray egg.
+  try {
+    const sig = async (b) => sharp(b).resize(16, 16, { fit: "fill" }).grayscale().raw().toBuffer();
+    const [a, d] = await Promise.all([sig(buf), sig(await fsp.readFile(path.join(HERE, "assets", "default-avatar.png")))]);
+    const diff = a.reduce((s, v, i) => s + Math.abs(v - d[i]), 0) / a.length;
+    if (diff < 12) throw Object.assign(new Error(`@${handle} has no profile picture set — nothing to fwairify`), { noPfp: true });
+  } catch (e) {
+    if (e.noPfp) throw e; // sharp/read failures fall through — the guard is best-effort
+  }
+  return buf;
 }
 
 let subjectBuf, name;
@@ -82,7 +102,11 @@ if (fs.existsSync(input)) {
 } else {
   if (!/^[A-Za-z0-9_]{1,15}$/.test(input)) die(`"${input}" is neither a file nor a valid handle`);
   console.log(`fetching pfp for @${input} …`);
-  subjectBuf = await fetchPfp(input);
+  try {
+    subjectBuf = await fetchPfp(input);
+  } catch (e) {
+    die(e.message);
+  }
   name = input.toLowerCase();
 }
 // normalize whatever we got (avif/webp/jpg, tiny sizes) to a clean square png
@@ -144,25 +168,20 @@ const client = new OpenAI();
 const subjectFile = await toFile(subjectBuf, "subject.png", { type: "image/png" });
 
 console.log(`generating ${nVariants} image(s) with ${refFiles.length} style ref(s), quality=${quality} …`);
-const req = {
+// note: gpt-image-2 rejects the input_fidelity param (gpt-image-1 only)
+const result = await client.images.edit({
   model: "gpt-image-2",
   image: [subjectFile, ...refFiles],
   prompt: PROMPT,
   size: "1024x1024",
   quality,
-  input_fidelity: "high",
   n: nVariants,
-};
-let result;
-try {
-  result = await client.images.edit(req);
-} catch (e) {
-  if (/input_fidelity/i.test(e.message)) {
-    delete req.input_fidelity;
-    result = await client.images.edit(req);
-  } else {
-    throw e;
-  }
+});
+
+if (result.usage) {
+  const u = result.usage;
+  const cost = u.input_tokens * 8e-6 + u.output_tokens * 30e-6;
+  console.log(`  usage: ${u.input_tokens} in + ${u.output_tokens} out ≈ $${cost.toFixed(3)}`);
 }
 
 const outs = [];
